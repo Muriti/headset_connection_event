@@ -4,8 +4,15 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbManager;
 import android.util.Log;
 import android.view.KeyEvent;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 public class HeadsetBroadcastReceiver extends BroadcastReceiver {
     private final HeadsetEventListener headsetEventListener;
@@ -27,6 +34,25 @@ public class HeadsetBroadcastReceiver extends BroadcastReceiver {
                     case 1:
                         headsetEventListener.onHeadsetConnect();
                         break;
+                }
+                break;
+            case UsbManager.ACTION_USB_DEVICE_ATTACHED:
+                UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
+                HashMap<String, UsbDevice> deviceList = manager.getDeviceList();
+                boolean result = false;
+                for (Map.Entry<String, UsbDevice> entry : deviceList.entrySet()) {
+                    result = hasUsbAudioInterfaceClass(entry.getValue());
+                    if (result) break;
+                }
+                if (result) {
+                    headsetEventListener.onHeadsetConnect();
+                }
+                break;
+            case UsbManager.ACTION_USB_DEVICE_DETACHED:
+                UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                boolean result1 = hasUsbAudioInterfaceClass(device);
+                if (result1) {
+                    headsetEventListener.onHeadsetDisconnect();
                 }
                 break;
             case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED: {
@@ -68,5 +94,14 @@ public class HeadsetBroadcastReceiver extends BroadcastReceiver {
                 }
                 break;
         }
+    }
+
+    boolean hasUsbAudioInterfaceClass(UsbDevice usbDevice) {
+        for (int i = 0; i < usbDevice.getInterfaceCount(); i++) {
+            if (usbDevice.getInterface(i).getInterfaceClass() == UsbConstants.USB_CLASS_AUDIO) {
+                return true;
+            }
+        }
+        return false;
     }
 }
